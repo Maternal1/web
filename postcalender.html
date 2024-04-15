@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>行事曆</title>
+</head>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 5px;
+    }
+
+    input,
+    textarea {
+        width: 80%;
+        padding: 8px;
+        margin-bottom: 10px;
+    }
+
+    button {
+        padding: 10px;
+        background-color: #99CCCC;
+        color: white;
+        border: none;
+        cursor: pointer;
+    }
+
+    #result {
+        margin-top: 20px;
+    }
+
+    .memo-item {
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        position: relative;
+    }
+
+    .action-buttons {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+    }
+
+    .action-buttons button {
+        margin-right: 5px;
+    }
+</style>
+
+<body>
+    <h1>Patient預約檢查項目</h1>
+    <form id="encounterForm">
+        <label for="patientId">輸入patientID:</label><br>
+        <input type="text" id="patientId"><br><br>
+        <label for="calender">日期:</label><br>
+        <input type="date" id="calender"><br>
+        <label for="memo">事項:</label><br>
+        <textarea id="memo" name="memo" rows="4" cols="50"></textarea><br>
+        <label for="clinic">診間:</label><br>
+        <input type="text" id="clinic"><br>
+        <label for="doctor">醫生:</label><br>
+        <input type="text" id="doctor"><br>
+        <button type="button" onclick="saveMemo()">儲存資料</button>
+    </form>
+
+    <script>
+        function saveMemo() {
+            const patientId = document.getElementById("patientId").value;
+
+            if (patientId === "") {
+                alert("請輸入patientID!");
+                return;
+            }
+
+            const data = {
+                patientId: patientId,
+                date: document.getElementById("calender").value,
+                memo: document.getElementById("memo").value,
+                clinic: document.getElementById("clinic").value,
+                doctor: document.getElementById("doctor").value
+            }
+
+            if (data.date === "" || data.memo === "" || data.clinic === "" || data.doctor === "") {
+                alert("資料填寫不完整!");
+                return;
+            }
+
+            const fhirData = convertToFhir(data);
+
+            fetch('https://fhir.tcumi.com:58443/r5/fhir/Encounter', {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(fhirData)
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error("Network response was not ok");
+                    }
+                    return response.json();
+                })
+                .then(responseData => {
+                    alert("FHIR data updated successfully:\n" + JSON.stringify(fhirData, null, 2));
+                    alert("送出成功!")
+                })
+                .catch(error => {
+                    console.error("Error uploading FHIR data:", error);
+                    alert("Error uploading FHIR data:\n" + error.message);
+                });
+
+            clearForm();
+        }
+
+        function convertToFhir(data) {
+            const fhirData = {
+                resourceType: "Encounter",
+                status: "planned",
+                subject: {
+                    reference: "Patient/" + data.patientId
+                },
+                actualPeriod: {
+                    start: data.date 
+                },
+                extension: [
+                    {
+                        url: "http://example.com/fhir/StructureDefinition/memo",
+                        valueString: data.memo
+                    },
+                    {
+                        url: "http://example.com/fhir/StructureDefinition/clinic",
+                        valueString: data.clinic
+                    },
+                    {
+                        url: "http://example.com/fhir/StructureDefinition/doctor",
+                        valueString: data.doctor
+                    }
+                ]
+            };
+            return fhirData;
+        }
+
+        function clearForm() {
+            document.getElementById('calender').value = '';
+            document.getElementById('memo').value = '';
+            document.getElementById('clinic').value = '';
+            document.getElementById('doctor').value = '';
+        }
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Get FHIR Resource</title>
+    <script src="setting.js"></script>
+    <script src="HTTP2024.js"></script>
+    <style type="text/css">
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #container {
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 400px;
+            text-align: center;
+        }
+
+        input[type=text] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        input[type=button] {
+            padding: 10px 20px;
+            background-color: #99CCCC;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        input[type=button]:hover {
+            background-color: #CCCCCC;
+        }
+
+        textarea {
+            width: calc(100% - 20px);
+            height: 300px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            resize: none;
+            font-size: 16px;
+            line-height: 1.5;
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            color: #333;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container" id="container">
+        <label for="patientId">輸入病人ID:</label>
+        <input type="text" id="Id"><br>
+        <input id="Button2" onclick="getData()" type="button" value="查詢" /><br><br>
+        <textarea id="TextArea1"></textarea>
+    </div>
+
+    <script>
+        let patientId = "";
+        function sendHttpGet(url, callback) {
+            fetch(url)
+                .then(response => response.text())
+                .then(data => callback(data))
+                .catch(error => console.error('Error:', error));
+        }
+
+        function getData() {
+            const patientId = document.getElementById("Id").value;
+
+            if (patientId == "") {
+                alert("請輸入patientID!");
+                return;
+            }
+            const apiURL = "https://fhir.tcumi.com:58443/r5/fhir/Observation?patient=" + patientId;
+            sendHttpGet(apiURL, callBack);
+        }
+
+        function callBack(ret) {
+            const bundle = JSON.parse(ret);
+
+            if (bundle.resourceType === "Bundle") {
+                const sortedEntries = bundle.entry.sort((a, b) => {
+                    const dateA = new Date(a.resource.effectiveDateTime);
+                    const dateB = new Date(b.resource.effectiveDateTime);
+                    return dateA - dateB;
+                });
+
+                let output = "";
+
+                sortedEntries.forEach(entry => {
+                    const thisResource = entry.resource;
+                    const observationDate = new Date(thisResource.effectiveDateTime).toLocaleDateString();
+                    const components = thisResource.component;
+
+                    if (components && Array.isArray(components)) {
+                        const weightComponent = components.find(component => component.code.coding[0].code === "29463-7");
+                        const DBPComponent = components.find(component => component.code.coding[0].code === "8462-4");
+                        const SBPComponent = components.find(component => component.code.coding[0].code === "8480-6");
+                        const SugarComponent = components.find(component => component.code.coding[0].code === "15074-8");
+                        const heartRateComponent = components.find(component => component.code.coding[0].code === "8867-4");
+                        const bodyTemperatureComponent = components.find(component => component.code.coding[0].code === "8310-5");
+
+                        if (weightComponent && DBPComponent && SBPComponent && SugarComponent && heartRateComponent && bodyTemperatureComponent) {
+                            const weight = weightComponent.valueQuantity.value;
+                            const DBP = DBPComponent.valueQuantity.value;
+                            const SBP = SBPComponent.valueQuantity.value;
+                            const Sugar = SugarComponent.valueQuantity.value;
+                            const heartRate = heartRateComponent.valueQuantity.value;
+                            const bodyTemperature = bodyTemperatureComponent.valueQuantity.value;
+
+                            output += `日期: ${observationDate}\n`;
+                            output += `體重: ${weight}\n`;
+                            output += `血壓: ${DBP} / ${SBP}\n`;
+                            output += `血糖: ${Sugar}\n`;
+                            output += `心率: ${heartRate}\n`;
+                            output += `體溫: ${bodyTemperature}\n`;
+                            output += "-----------------\n";
+                        }
+                    }
+                });
+                document.getElementById("TextArea1").value = output;
+            }
+        }
+    </script>
+</body>
+</html>
